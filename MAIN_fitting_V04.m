@@ -46,55 +46,53 @@ u1 = 7E-9;
 Ga = G0-Gmax*1/((1+exp(u0/s0))*(1+exp(u1/s1)));
 
 %% TEST
-f_probe = [100 300 500 700 900 1000 2000 3000 4000 5000];   % input signal frequencies
-param = [2.13e-3 0.1];
 
-ratio = IHC_ACDC_V02(f_probe,param);
+levels = 10:5:100;  % tone levels
+amp = 20e-6.*10.^(levels./20); % Amplitude in Pa;
+amp_axis = [-flip(amp) amp];
+
+%param = [2.13e-3 0.1];
+param = [0.1107 0.0027];
+
+[in_out] = IHC_IO(amp,param);
+
+load('data_i_o.mat')
 
 figure
-loglog(f_probe, ratio,'linewidth', linesize);
+plot(amp_axis, in_out,'-o','linewidth', linesize);
+hold on
+scatter(Russell_600(:,1),Russell_600(:,2),80,'filled')
 grid on
-%xlim([0.1e3 5e3])
-ylim([0.1 10])
 set(gca, 'FontSize', axisnumbersize,  'fontweight', 'bold', 'linewidth', linesize);
 
 %% FITTING
 
-load('data_palmer.mat')
+load('data_i_o.mat')
 
-handle = @IHC_ACDC_V02;
-fun  = @(a,xdata) IHC_ACDC_V02(xdata,a);
+handle = @IHC_IO;
+fun  = @(a,xdata) IHC_IO(xdata,a);
 
-%guess = [u0 s0 u1 s1];  % starting guess
+%guess = [2.13E-3 0.1];
 guess = [9.45E-9 52.7E-9 63.1E-9 29.4E-9 12.7E-9 0.33E-9]; % Lopez
 
-%guess = [9.45E-9 52.7E-9 63.1E-9 29.4E-9 12.7E-9 0.33E-9 2.13E-3 0.1];
-%guess = [2.13E-3 0.1];
 
-xdata = Data_01(:,1)*1e3;      % X values
-ydata = Data_01(:,2);          % Y values
+pos_points = Russell_600(1:4,1);
+neg_points = Russell_600(5:end,1);
+xdata = [pos_points; -neg_points];     % X values
+ydata = Russell_600(:,2);      % Y values
 
-%opts = statset('nlinfit');
-%opts.FunValCheck = 'off';
+[params,~,~,~,~]   = nlinfit(xdata,ydata,fun,guess);  
 
-[param,~,~,~,~]   = nlinfit(xdata,ydata,fun,guess);  
-
-x = linspace(100,4000,50);
-fit_funct = fun(param, x);
+x = linspace(0,2,50);
+fit_funct = fun(params, x);
 
 figure
-loglog(x/1e3, fit_funct, '-', 'LineWidth', linesize);
+plot(x, fit_funct,'linewidth', linesize);
 hold on
-scatter(xdata/1e3,ydata,80, 'o', 'filled');
+scatter(Russell_600(:,1),Russell_600(:,2),80,'filled')
 grid on
-ylim([0.1 10])
-xlabel('Frequency in kHz','FontSize',20) 
-ylabel('AC/DC component','FontSize',20)
-title('80dB')
-yticks([0.1 0.3 1 3 ])
-yticklabels({'0.1','0.3','1','3','10'})
-xticks([0.1 1 3 10 ])
-xticklabels({'0.1','1','3','10'})
+xlabel('Level in Pa','FontSize',20) 
+ylabel('Peak Potential','FontSize',20)
 set(gca, 'FontSize', axisnumbersize,  'fontweight', 'bold', 'linewidth', linesize);
 
 %% Check Boltzmann function
@@ -127,20 +125,14 @@ dis_vs_cond = [-95.42483660130719, 0.016393442622952392
 dis_vs_cond(:,1) = dis_vs_cond(:,1)*1E-9;
 
 x = linspace(min(dis_vs_cond(:,1))-1E-7,max(dis_vs_cond(:,1))+1E-7, 500);
-%a = param;
-a_L = [9.45E-9 52.7E-9 63.1E-9 29.4E-9 12.7E-9 0.33E-9]; % Lopez
-% a = [8E-9 7E-9 85E-9 7E-9 5E-9 1.2E-9]; % Somner
-a = [9.45E-9 52.7E-9 63.1E-9 29.4E-9 25E-9 0.33E-9];
+a = param;
 
 G = a(1)*1./((1+exp(-(x-a(2))/a(3))).*(1+exp(-(x-a(4))/a(5))))+ a(6) ;    
-G_L = a_L(1)*1./((1+exp(-(x-a_L(2))/a_L(3))).*(1+exp(-(x-a_L(4))/a_L(5))))+ a_L(6) ;    
+%G = Gmax*1./((1+exp(-(x-a(1))/a(2))).*(1+exp(-(x-a(3))/a(4)))); % + a(5);    
 
 figure
 scatter(dis_vs_cond(:,1)/1E-9, dis_vs_cond(:,2),80, 'o', 'filled');
 grid on
 hold on
-plot(x/1E-9, G_L/1E-9, '-', 'LineWidth', linesize);
 plot(x/1E-9, G/1E-9, '-', 'LineWidth', linesize);
-legend('data','lopez','model')
-
 

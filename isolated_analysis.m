@@ -31,7 +31,7 @@ axisnumbersize = 10;       % Set size of axis numbers.
 flow=100;
 fhigh= 8e3;
 %fc = erbspace(flow, fhigh, 60); % choose centre frequencies
-fc = 4e3;
+fc = 600;
 drnlchannels = size(fc,2);
 
 sbj='NH'; % DRNL profiles:'NH'/'OHCloss_5dB'/'OHCloss_10dB'/'OHCloss_20dB'/'OHCloss_30dB'/'HIx'
@@ -47,11 +47,11 @@ N_zeros = 20e-3*fs;     % zero-pad signal
 t = (0:Nsamp-1)/fs;         % time axis
 f = (0:Nsamp-1)*fs/Nsamp;   % freq axis
 
-f_probe = 4000;
+f_probe = 600;
 
-levels = 10;
-
+levels = 10:10:100;
 amp = 20e-6.*10.^(levels./20); % Amplitude in Pa;
+nlevels = length(amp);
 
 % Ramp up/downn
 window = hanning(2*floor(fs*ramp_dur))'; 
@@ -61,64 +61,72 @@ w = [w1 ones(1,Nsamp-length(w1)-length(w2)) w2];
 
 %% ------------- RUN MODEL ------------------ %%
 
-x = amp.*sin(2*pi*f_probe*t); % Tone
-x = [x.*w zeros(1,N_zeros)];
-N_org= length(x);
+for j = 1:nlevels  % Loop over levels
 
-b_hp = HeadphoneFilter(fs);     % calc headphone filtercoeffs
-b_me = middleearfilter_v2(fs);  % calc middle ear filtercoeffs
-
-inoutsig = filter(b_hp,1,x); % Outer-ear filterring
-inoutsig = filter(b_me,1,inoutsig); % middle-ear-ear filterring
-
-% DRNL filter
-outsig = drnl_HI(inoutsig,fc,fs, sbj);
-
-% IHC TRANSDUCTION 
-tau = 2.13E-3;   %low-pass filter applied to drnl output
-C = 0.1;
-
-b = [0 tau*C];
-a_filt = [tau 1];
-
-[b_z,a_z] = bilinear(b,a_filt,pi);
-ster_disp = filter(b_z,a_z,outsig,[],1); % stereocilia displacement        
-
-% Conductance
-Et = 100E-3;
-Ek = -70.45E-3;
-Omega = 40E-3;    % correction factor
-Ekp = Ek+Et*Omega;
-Gk = 18E-9;
-Cm = 6E-12;
-Gmax = 8E-9;
-%a = [8E-9 7E-9 85E-9 7E-9 5E-9 0.215E-9]; %SOmner
-a = [9.45E-9 52.7E-9 63.1E-9 29.4E-9 12.7E-9 0.33E-9]; % Lopez
-
-G = a(1)*1./((1+exp(-(ster_disp-a(2))/a(3))).*(1+exp(-(ster_disp-a(4))/a(5)))) + a(6) ; 
-G0 = a(1)*1./((1+exp(a(2)/a(3))).*(1+exp(a(4)/a(5)))) + a(6);
-
-% Intracellular Potential
-V_rest = (Gk*Ekp+G0*Et)./(G0+Gk);
-V_now = V_rest;
-
-V = zeros(1,Nsamp+N_zeros);
-    for ii=1:Nsamp+N_zeros
-            V_now = V_now + (-G(:,ii).*(V_now-Et)-...
-                Gk*(V_now-Ekp))*Ts/Cm;
-            V(:,ii)=V_now;
-    end
+    x = amp(j).*sin(2*pi*f_probe*t); % Tone
+    x = [x.*w zeros(1,N_zeros)];
+    N_org= length(x);
+    
+    b_hp = HeadphoneFilter(fs);     % calc headphone filtercoeffs
+    b_me = middleearfilter_v2(fs);  % calc middle ear filtercoeffs
+    
+    inoutsig = filter(b_hp,1,x); % Outer-ear filterring
+    inoutsig = filter(b_me,1,inoutsig); % middle-ear-ear filterring
+    
+    % DRNL filter
+    outsig = drnl_HI(inoutsig,fc,fs, sbj);
+    
+    % IHC TRANSDUCTION 
+    tau = 2.13E-3;   %low-pass filter applied to drnl output
+    C = 0.0251;
+    
+    b = [0 tau*C];
+    a_filt = [tau 1];
+    
+    [b_z,a_z] = bilinear(b,a_filt,pi);
+    ster_disp = filter(b_z,a_z,outsig,[],1); % stereocilia displacement        
+    
+    % Conductance
+    Et = 100E-3;
+    Ek = -70.45E-3;
+    Omega = 40E-3;    % correction factor
+    Ekp = Ek+Et*Omega;
+    Gk = 18E-9;
+    Cm = 6E-12;
+    Gmax = 8E-9;
+    a = [8E-9 7E-9 85E-9 7E-9 5E-9 0.215E-9]; %SOmner
+    %a = [9.45E-9 52.7E-9 63.1E-9 29.4E-9 12.7E-9 0.33E-9]; % Lopez
+    
+    G = a(1)*1./((1+exp(-(ster_disp-a(2))/a(3))).*(1+exp(-(ster_disp-a(4))/a(5)))) + a(6) ; 
+    G0 = a(1)*1./((1+exp(a(2)/a(3))).*(1+exp(a(4)/a(5)))) + a(6);
+    
+    % Intracellular Potential
+    V_rest = (Gk*Ekp+G0*Et)./(G0+Gk);
+    V_now = V_rest;
+    
+    V = zeros(1,Nsamp+N_zeros);
+        for ii=1:Nsamp+N_zeros
+                V_now = V_now + (-G(:,ii).*(V_now-Et)-...
+                    Gk*(V_now-Ekp))*Ts/Cm;
+                V(:,ii)=V_now;
+        end
 
 % Reference - envelope extraction
-signal = envextract(outsig,fs);
+signal(j,:) = envextract(outsig,fs);
 
+outsig_fin(j,:) = outsig;
+ster_disp_fin(j,:) = ster_disp;
+G_fin(j,:) = G;
+V_fin(j,:) = V;
+
+end
 %% PLOT 
 
 t_axis = (0:Nsamp+N_zeros-1)/fs;  % time vector
 
 figure 
 subplot(4,1,1)
-plot(t_axis/1e-3, outsig/1e-3,'linewidth', linesize);
+plot(t_axis/1e-3, outsig_fin(3:5,:)/1e-3,'linewidth', linesize);
 grid on
 xlim([0 80])
 xlabel('t in ms')
@@ -126,7 +134,7 @@ ylabel('BM velocity [mm/s]')
 set(gca, 'FontSize', axisnumbersize,  'fontweight', 'bold', 'linewidth', linesize);
 
 subplot(4,1,2)
-plot(t_axis/1e-3, ster_disp/1e-9,'linewidth', linesize);
+plot(t_axis/1e-3, ster_disp_fin(3:5,:)/1e-9,'linewidth', linesize);
 grid on
 xlim([0 80])
 xlabel('t in ms')
@@ -134,7 +142,7 @@ ylabel('cilia disp [nm]')
 set(gca, 'FontSize', axisnumbersize,  'fontweight', 'bold', 'linewidth', linesize);
 
 subplot(4,1,3)
-plot(t_axis/1e-3, G/1e-9,'linewidth', linesize);
+plot(t_axis/1e-3, G_fin(3:5,:)/1e-9,'linewidth', linesize);
 grid on
 xlim([0 80])
 xlabel('t in ms')
@@ -142,13 +150,16 @@ ylabel('Conductance [nS]')
 set(gca, 'FontSize', axisnumbersize,  'fontweight', 'bold', 'linewidth', linesize);
 
 subplot(4,1,4)
-plot(t_axis/1e-3, V/1e-3,'linewidth', linesize);
+plot(t_axis/1e-3, V_fin(3:5,:)/1e-3,'linewidth', linesize);
 grid on
 xlim([0 80])
 %ylim([-60 -30])
 xlabel('t in ms')
 ylabel('Potential [mV]')
 set(gca, 'FontSize', axisnumbersize,  'fontweight', 'bold', 'linewidth', linesize);
+
+
+%% 
 
 figure 
 plot(t_axis/1e-3, signal/1e-3,'linewidth', linesize);
@@ -159,3 +170,16 @@ xlabel('t in ms')
 ylabel('Output [mMU]')
 set(gca, 'FontSize', axisnumbersize,  'fontweight', 'bold', 'linewidth', linesize);
 
+%% 
+
+figure
+plot(t_axis/1e-3, V_fin(3,:)/1e-3 - V_rest/1e-3,'linewidth', linesize);
+hold on
+plot(t_axis/1e-3, V_fin(5,:)/1e-3 - V_rest/1e-3,'linewidth', linesize);
+plot(t_axis/1e-3, V_fin(10,:)/1e-3 - V_rest/1e-3,'linewidth', linesize);
+grid on
+xlim([0 80])
+legend('30','50','100')
+xlabel('t in ms')
+ylabel('Potential [mV]')
+set(gca, 'FontSize', axisnumbersize,  'fontweight', 'bold', 'linewidth', linesize);

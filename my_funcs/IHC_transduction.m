@@ -19,7 +19,7 @@ Ts = 1/fs;
 
 % Parameters of high-pass filter
 tau = 2.13E-3;
-C = 0.008;
+C = 0.0251;
 
 b = [0 tau*C];
 a = [tau 1];
