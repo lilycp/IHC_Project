@@ -22,7 +22,7 @@ close all,
 clear
 clc
 
-addpath(genpath('/Users/liliana/Documents/PhD/MATLAB/IHC_project'))
+addpath(genpath('/Users/lpau/Desktop/PhD/MATLAB/IHC_project'))
 
 %% PARAMETERS
 

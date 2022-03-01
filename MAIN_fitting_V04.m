@@ -19,7 +19,7 @@ close all
 clear
 clc
 
-addpath(genpath('/Users/liliana/Documents/PhD/MATLAB/IHC_project'))
+addpath(genpath('/Users/lpau/Desktop/IHC_project'))
 
 linesize       = 1.5;      % Set thickness of plot lines.
 axislabelsize  = 10;       % Set size of axis labels (text).
